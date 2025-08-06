@@ -12,13 +12,6 @@ st.set_page_config(
     page_icon="🛥️",
     layout="wide",
     initial_sidebar_state="expanded",
-    theme=dict(
-        primaryColor="#14f1ff",
-        backgroundColor="#0e1117",
-        secondaryBackgroundColor="#1c1f26",
-        textColor="#e8e8e8",
-        font="Fira Code",
-    ),
 )
 
 # --------- Custom CSS for futuristic look ---------
