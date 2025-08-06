@@ -85,7 +85,19 @@ def generate(prompt: str) -> Tuple[str, int, int]:
     )
     usage = resp.usage  # type: ignore[attr-defined]
     text = resp.choices[0].message.content.strip()  # type: ignore[index]
-    return text, usage["prompt_tokens"], usage["completion_tokens"]
+
+    # Groq may return usage as a dict-like object, an object with attributes, or None.
+    if usage:
+        if isinstance(usage, dict):
+            prompt_tok = usage.get("prompt_tokens", 0)
+            completion_tok = usage.get("completion_tokens", 0)
+        else:  # object with attributes
+            prompt_tok = getattr(usage, "prompt_tokens", 0)
+            completion_tok = getattr(usage, "completion_tokens", 0)
+    else:
+        prompt_tok = completion_tok = 0
+
+    return text, prompt_tok, completion_tok
 
 
 # Second-pass refinement helper
