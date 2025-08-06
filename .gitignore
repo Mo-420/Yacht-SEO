@@ -1,0 +1,5 @@
+*.env
+yacht_descriptions.csv
+sample_yachts.csv
+.venv/
+__pycache__/
