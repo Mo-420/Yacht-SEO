@@ -87,6 +87,10 @@ else:
     api_key = st.sidebar.text_input("Groq API key", type="password")
 batch_size = st.sidebar.number_input("Batch size", min_value=1, value=1, step=1, help="How many yachts to send per API request")
 verbose = st.sidebar.checkbox("Verbose per-yacht cost log")
+
+# Optional model and temperature tuning
+model_id = st.sidebar.text_input("Groq model ID", value=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
+temperature_ui = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7, step=0.05)
 refine = st.sidebar.checkbox("Refine / proofread descriptions")
 
 uploaded = st.file_uploader("Upload your yachts.csv", type="csv")
@@ -107,6 +111,8 @@ if st.button("Generate descriptions"):
 
     # Pass key to underlying script via env var
     os.environ["GROQ_API_KEY"] = api_key
+    os.environ["GROQ_MODEL"] = model_id
+    os.environ["GROQ_TEMPERATURE"] = str(temperature_ui)
 
     with st.spinner("Generating yacht descriptions … this may take a minute …"):
         generate(tmp_in_path, out_path, batch_size, verbose, refine)

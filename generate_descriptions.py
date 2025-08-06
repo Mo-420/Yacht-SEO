@@ -34,6 +34,12 @@ if not API_KEY:
 MODEL_ID = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 API_BASE = os.getenv("GROQ_API_BASE")  # optional custom endpoint
 
+# Allow runtime control of sampling temperature via env var
+try:
+    _TEMP = float(os.getenv("GROQ_TEMPERATURE", "0.7"))
+except ValueError:
+    _TEMP = 0.7
+
 TOKEN_PRICE_IN = 0.15 / 1_000_000  # USD per prompt token
 TOKEN_PRICE_OUT = 0.75 / 1_000_000  # USD per completion token
 
@@ -81,7 +87,7 @@ def generate(prompt: str) -> Tuple[str, int, int]:
         model=MODEL_ID,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1100,
-        temperature=0.7,
+        temperature=_TEMP,
     )
     usage = resp.usage  # type: ignore[attr-defined]
     text = resp.choices[0].message.content.strip()  # type: ignore[index]
