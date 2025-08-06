@@ -92,6 +92,7 @@ verbose = st.sidebar.checkbox("Verbose per-yacht cost log")
 model_id = st.sidebar.text_input("Groq model ID", value=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
 temperature_ui = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7, step=0.05)
 refine = st.sidebar.checkbox("Refine / proofread descriptions")
+custom_prompt = st.sidebar.text_area("Custom prompt base (optional)")
 
 uploaded = st.file_uploader("Upload your yachts.csv", type="csv")
 
@@ -113,6 +114,8 @@ if st.button("Generate descriptions"):
     os.environ["GROQ_API_KEY"] = api_key
     os.environ["GROQ_MODEL"] = model_id
     os.environ["GROQ_TEMPERATURE"] = str(temperature_ui)
+    if custom_prompt.strip():
+        os.environ["CUSTOM_PROMPT_BASE"] = custom_prompt.strip()
 
     with st.spinner("Generating yacht descriptions … this may take a minute …"):
         generate(tmp_in_path, out_path, batch_size, verbose, refine)

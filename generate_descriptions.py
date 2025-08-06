@@ -43,8 +43,8 @@ except ValueError:
 TOKEN_PRICE_IN = 0.15 / 1_000_000  # USD per prompt token
 TOKEN_PRICE_OUT = 0.75 / 1_000_000  # USD per completion token
 
-# Long-form SEO prompt base
-PROMPT_BASE = (
+# Long-form SEO prompt base (can be overridden at runtime via CUSTOM_PROMPT_BASE env var)
+_DEFAULT_PROMPT_BASE = (
     "Write a 700-word, SEO-optimised luxury-yacht description. "
     "Use keywords: luxury catamaran Greece, Sunreef 80 charter, Mediterranean yacht holidays, "
     "private yacht with water toys. "
@@ -52,6 +52,8 @@ PROMPT_BASE = (
     "Conclude with a 140-character meta description and a clear call-to-action. "
     "Keep strictly to the supplied data; do NOT invent features.\n\n"
 )
+
+PROMPT_BASE = os.getenv("CUSTOM_PROMPT_BASE", _DEFAULT_PROMPT_BASE)
 
 # Prompt used for the refinement pass
 REFINE_PROMPT = (
