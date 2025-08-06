@@ -2,14 +2,76 @@ import os
 import tempfile
 import pandas as pd
 import streamlit as st
+from streamlit_lottie import st_lottie
+import requests
 
 from generate_descriptions import run as generate
 
-st.set_page_config(page_title="Yacht-SEO Generator", layout="centered")
+st.set_page_config(
+    page_title="Yacht-SEO Generator",
+    page_icon="🛥️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    theme=dict(
+        primaryColor="#14f1ff",
+        backgroundColor="#0e1117",
+        secondaryBackgroundColor="#1c1f26",
+        textColor="#e8e8e8",
+        font="Fira Code",
+    ),
+)
 
-st.title("🛥️ Yacht-SEO Description Builder")
+# --------- Custom CSS for futuristic look ---------
+st.markdown(
+    """
+    <style>
+    /* Glass card */
+    .glass {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(5px);
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    /* Neon download button */
+    .stDownloadButton>button {
+        color:#0e1117 !important;
+        background:#14f1ff !important;
+        border:none;
+        border-radius:50px;
+        padding:0.6rem 1.4rem;
+        box-shadow:0 0 10px #14f1ff;
+        transition: all 0.3s ease-in-out;
+    }
+    .stDownloadButton>button:hover {
+        background:#1bffff !important;
+        box-shadow:0 0 20px #1bffff;
+        transform: translateY(-2px);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-st.markdown("Upload a CSV of yachts, enter your Groq API key, and get fully-formatted SEO descriptions back — no command line needed.")
+st.title("✨ AI-Powered Luxury-Yacht Copywriter")
+
+# Lottie animation header
+
+def load_lottie(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        return None
+
+lottie_json = load_lottie("https://assets9.lottiefiles.com/packages/lf20_q5pk6p1k.json")
+if lottie_json:
+    st_lottie(lottie_json, speed=1, height=180, key="header_anim")
+
+st.markdown("Upload a CSV of yachts, tweak settings on the left, and watch the neon magic unfold.")
 
 api_key = st.sidebar.text_input("Groq API key", type="password")
 batch_size = st.sidebar.number_input("Batch size", min_value=1, value=1, step=1, help="How many yachts to send per API request")
@@ -41,11 +103,11 @@ if st.button("Generate descriptions"):
 
     # Preview results in a friendly table
     df = pd.read_csv(out_path)
-    st.subheader("Preview of generated descriptions")
+    st.subheader("🔍 Preview of generated descriptions")
     for _, row in df.iterrows():
-        with st.expander(row.get("name", "Yacht")):
+        with st.expander(f"🛥️ {row.get('name', 'Yacht')}"):
             html = row.get("seo_description_refined") if refine else row.get("seo_description")
-            st.markdown(html, unsafe_allow_html=True)
+            st.markdown(f"<div class='glass'>{html}</div>", unsafe_allow_html=True)
             st.code(html, language="html")
 
     # Offer download
