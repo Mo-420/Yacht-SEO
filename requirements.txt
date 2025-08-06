@@ -6,3 +6,5 @@ retrying==1.3.*
 streamlit==1.*
 pandas==1.*
 streamlit-lottie==0.*
+gspread==6.*
+google-auth==2.*

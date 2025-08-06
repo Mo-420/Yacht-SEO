@@ -84,4 +84,33 @@ Optional:
 * Adjust upload limits in `.streamlit/config.toml` (already set to 50 MB).
 * Add the Streamlit badge above (update the link with your unique URL).
 
+---
+
+## Where do I get a Groq API key?
+
+1. Sign up or log in at <https://console.groq.com>.
+2. Go to **API Keys** → **Create Key**.  
+3. Copy the key starting with `sk-` and paste it
+   * into `.env` (local), **or**
+   * into *Streamlit Cloud → Settings → Secrets* under the name `GROQ_API_KEY`.
+
+The default model slug is already set to `gpt-oss-120b`; change `GROQ_MODEL` if Groq releases a newer model.
+
+---
+
+## Using Google Sheets instead of CSV
+
+1. Enable the Google Sheets API and create a **service account** in Google Cloud.  
+2. Download the JSON key and paste its entire contents (one line) into a secret
+   called `GOOGLE_SHEET_CREDS` in Streamlit Cloud.
+3. Share your target Sheet with the service-account email and grab the Sheet ID
+   (string between `/d/` and `/edit` in the URL).  
+4. Add another secret `SHEET_ID` with that value.  
+5. In the app sidebar tick **“Use Google Sheet”** and specify the tab name if it’s
+   not `Sheet1`.
+
+When you click **Generate descriptions**, the app reads rows from the Sheet,
+writes back the new `seo_description` (and optional
+`seo_description_refined`) columns, and still offers a downloadable CSV.
+
 [//]: # (Happy sailing!)

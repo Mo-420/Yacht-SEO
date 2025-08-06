@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 from retrying import retry
 from tqdm import tqdm
 from rich.console import Console
+import pandas as pd
+
+try:
+    import sheets  # local module for Google Sheets helper functions
+except ImportError:
+    sheets = None  # typed: ignore
 
 # Third‐party Groq client
 from groq import Groq
@@ -92,9 +98,28 @@ def refine_description(description: str) -> Tuple[str, int, int]:
 # Main
 # ---------------------------------------------------------------------------
 
-def run(input_csv: str, output_csv: str, batch_size: int, verbose: bool, refine: bool = False) -> None:
-    with open(input_csv, newline="", encoding="utf-8") as f:
-        rows: List[Dict[str, str]] = list(csv.DictReader(f))
+def run(
+    input_csv: str,
+    output_csv: str,
+    batch_size: int,
+    verbose: bool,
+    refine: bool = False,
+    use_sheet: bool = False,
+    sheet_tab: str = "Sheet1",
+) -> None:
+    if use_sheet:
+        if sheets is None:
+            console.print("[bold red]Sheets module not available.[/]")
+            sys.exit(1)
+        try:
+            df_in = sheets.read_df(sheet_tab)
+        except Exception as e:
+            console.print(f"[bold red]Failed to read Google Sheet: {e}[/]")
+            sys.exit(1)
+        rows: List[Dict[str, str]] = df_in.to_dict(orient="records")
+    else:
+        with open(input_csv, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
 
     total_prompt = total_completion = 0
     out_rows: List[Dict[str, str]] = []
@@ -133,11 +158,19 @@ def run(input_csv: str, output_csv: str, batch_size: int, verbose: bool, refine:
 
         out_rows.extend(batch)
 
-    # Write output file
+    # Convert to DataFrame for optional sheet write
+    df_out = pd.DataFrame(out_rows)
+
+    # Write output file for download archive
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=out_rows[0].keys())
-        writer.writeheader()
-        writer.writerows(out_rows)
+        df_out.to_csv(f, index=False)
+
+    # If using sheet, push results back
+    if use_sheet:
+        try:
+            sheets.write_df(df_out, sheet_tab)
+        except Exception as e:
+            console.print(f"[bold red]Failed to write back to Google Sheet: {e}[/]")
 
     # Optional refinement step
     if refine:
@@ -163,6 +196,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--demo", action="store_true", help="Use sample_yachts.csv as input")
     p.add_argument("--verbose", action="store_true", help="Print per-yacht cost during processing")
     p.add_argument("--refine", action="store_true", help="Run second-pass refinement on each description")
+    p.add_argument("--sheet", action="store_true", help="Use Google Sheet instead of local CSV. Requires env vars GOOGLE_SHEET_CREDS & SHEET_ID.")
+    p.add_argument("--sheet-tab", default="Sheet1", help="Worksheet tab name to read/write (default: Sheet1)")
     return p.parse_args()
 
 
@@ -170,8 +205,18 @@ if __name__ == "__main__":
     args = parse_args()
 
     input_file = "sample_yachts.csv" if args.demo else args.input
-    if not os.path.exists(input_file):
-        console.print(f"[bold red]❌ Input CSV not found: {input_file}[/]")
-        sys.exit(1)
 
-    run(input_file, args.output, max(1, args.batch), args.verbose, args.refine)
+    if not args.sheet:
+        if not os.path.exists(input_file):
+            console.print(f"[bold red]❌ Input CSV not found: {input_file}[/]")
+            sys.exit(1)
+
+    run(
+        input_file,
+        args.output,
+        max(1, args.batch),
+        args.verbose,
+        args.refine,
+        args.sheet,
+        args.sheet_tab,
+    )
