@@ -66,7 +66,13 @@ if lottie_json:
 
 st.markdown("Upload a CSV of yachts, tweak settings on the left, and watch the neon magic unfold.")
 
-api_key = st.sidebar.text_input("Groq API key", type="password")
+DEFAULT_GROQ_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+
+# Ask for key only if not already supplied via environment/secrets
+if DEFAULT_GROQ_KEY:
+    api_key = DEFAULT_GROQ_KEY  # use predefined key
+else:
+    api_key = st.sidebar.text_input("Groq API key", type="password")
 batch_size = st.sidebar.number_input("Batch size", min_value=1, value=1, step=1, help="How many yachts to send per API request")
 verbose = st.sidebar.checkbox("Verbose per-yacht cost log")
 refine = st.sidebar.checkbox("Refine / proofread descriptions")
