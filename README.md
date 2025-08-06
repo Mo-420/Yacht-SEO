@@ -2,6 +2,8 @@
 
 Generate SEO-optimized descriptions for yachts using the Groq LLM.
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io)
+
 ## Quick start (bash)
 
 ```bash
@@ -58,6 +60,28 @@ requirements.txt   # dependencies
 sample_yachts.csv  # example input
 generate_descriptions.py  # main script
 sheets.py          # future Google Sheets hook
+
+---
+
+## Deploy to Streamlit Cloud (zero-install for users)
+
+1. Push this repo to GitHub (public or private).
+2. Sign in at <https://streamlit.io> → **Deploy an app**.
+3. Select the repo/branch and set **main file** to `app.py`.
+4. Click **Deploy** – Streamlit Cloud builds the app automatically.
+
+Within a couple of minutes you’ll get a public HTTPS link like:
+
 ```
+https://yacht-seo-abc123.streamlit.app
+```
+
+Share that link; anyone can open it on their phone or desktop, paste their Groq API key, upload a CSV, and generate descriptions – no command line required.
+
+Optional:
+
+* Map a custom domain under *Settings → Custom Domains*.
+* Adjust upload limits in `.streamlit/config.toml` (already set to 50 MB).
+* Add the Streamlit badge above (update the link with your unique URL).
 
 [//]: # (Happy sailing!)

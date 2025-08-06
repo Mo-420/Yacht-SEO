@@ -1,0 +1,11 @@
+[server]
+maxUploadSize = 50
+headless = true
+
+[theme]
+base="dark"
+primaryColor="#14f1ff"
+backgroundColor="#0e1117"
+secondaryBackgroundColor="#1c1f26"
+textColor="#e8e8e8"
+font="Fira Code"
