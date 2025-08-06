@@ -1,10 +1,22 @@
+# --- Standard libs ---
 import os
 import tempfile
+
+# --- Third-party ---
 import pandas as pd
 import streamlit as st
 from streamlit_lottie import st_lottie
 import requests
 
+# ------------------------------------------------------------
+# Pre-load GROQ key (if provided via secrets) before downstream imports
+# ------------------------------------------------------------
+
+_PRELOAD_GROQ_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+if _PRELOAD_GROQ_KEY:
+    os.environ["GROQ_API_KEY"] = _PRELOAD_GROQ_KEY
+
+# Local modules (import AFTER env is set so they pick it up)
 from generate_descriptions import run as generate
 
 st.set_page_config(
