@@ -1,5 +1,6 @@
 import os
 import tempfile
+import pandas as pd
 import streamlit as st
 
 from generate_descriptions import run as generate
@@ -13,6 +14,7 @@ st.markdown("Upload a CSV of yachts, enter your Groq API key, and get fully-form
 api_key = st.sidebar.text_input("Groq API key", type="password")
 batch_size = st.sidebar.number_input("Batch size", min_value=1, value=1, step=1, help="How many yachts to send per API request")
 verbose = st.sidebar.checkbox("Verbose per-yacht cost log")
+refine = st.sidebar.checkbox("Refine / proofread descriptions")
 
 uploaded = st.file_uploader("Upload your yachts.csv", type="csv")
 
@@ -35,8 +37,19 @@ if st.button("Generate descriptions"):
     os.environ["GROQ_API_KEY"] = api_key
 
     with st.spinner("Generating yacht descriptions … this may take a minute …"):
-        generate(tmp_in_path, out_path, batch_size, verbose)
+        generate(tmp_in_path, out_path, batch_size, verbose, refine)
 
+    # Preview results in a friendly table
+    df = pd.read_csv(out_path)
+    st.subheader("Preview of generated descriptions")
+    for _, row in df.iterrows():
+        with st.expander(row.get("name", "Yacht")):
+            html = row.get("seo_description_refined") if refine else row.get("seo_description")
+            st.markdown(html, unsafe_allow_html=True)
+            st.code(html, language="html")
+
+    # Offer download
     with open(out_path, "rb") as f:
         st.success("Done! Click below to download your new CSV.")
-        st.download_button("📥 Download yacht_descriptions.csv", f, file_name="yacht_descriptions.csv", mime="text/csv")
+        fname = "yacht_descriptions_refined.csv" if refine else "yacht_descriptions.csv"
+        st.download_button("📥 Download result CSV", f, file_name=fname, mime="text/csv")

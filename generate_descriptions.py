@@ -41,6 +41,13 @@ PROMPT_BASE = (
     "Keep strictly to the supplied data; do NOT invent features.\n\n"
 )
 
+# Prompt used for the refinement pass
+REFINE_PROMPT = (
+    "Improve the following luxury-yacht description: fix any grammar issues, tighten wording, "
+    "ensure keywords remain, keep all facts, preserve HTML structure, and keep length similar. "
+    "Return the refined description only without extra commentary.\n\n"
+)
+
 client_kwargs = dict(api_key=API_KEY)
 if API_BASE:
     client_kwargs["base_url"] = API_BASE
@@ -75,11 +82,17 @@ def generate(prompt: str) -> Tuple[str, int, int]:
     return text, usage["prompt_tokens"], usage["completion_tokens"]
 
 
+# Second-pass refinement helper
+def refine_description(description: str) -> Tuple[str, int, int]:
+    prompt = REFINE_PROMPT + description
+    return generate(prompt)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-def run(input_csv: str, output_csv: str, batch_size: int, verbose: bool) -> None:
+def run(input_csv: str, output_csv: str, batch_size: int, verbose: bool, refine: bool = False) -> None:
     with open(input_csv, newline="", encoding="utf-8") as f:
         rows: List[Dict[str, str]] = list(csv.DictReader(f))
 
@@ -126,6 +139,15 @@ def run(input_csv: str, output_csv: str, batch_size: int, verbose: bool) -> None
         writer.writeheader()
         writer.writerows(out_rows)
 
+    # Optional refinement step
+    if refine:
+        console.print("\n[bold cyan]🔄 Running refinement pass...[/]")
+        for row in tqdm(out_rows, desc="Refining", leave=False):
+            refined, p_tok, c_tok = refine_description(row["seo_description"])
+            row["seo_description_refined"] = refined
+            total_prompt += p_tok
+            total_completion += c_tok
+
     cost_total = total_prompt * TOKEN_PRICE_IN + total_completion * TOKEN_PRICE_OUT
     console.print(
         f"[bold green]✅ Finished.[/] Prompt tokens: {total_prompt:,}, "
@@ -140,6 +162,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch", type=int, default=1, help="Number of yachts per API request")
     p.add_argument("--demo", action="store_true", help="Use sample_yachts.csv as input")
     p.add_argument("--verbose", action="store_true", help="Print per-yacht cost during processing")
+    p.add_argument("--refine", action="store_true", help="Run second-pass refinement on each description")
     return p.parse_args()
 
 
@@ -151,4 +174,4 @@ if __name__ == "__main__":
         console.print(f"[bold red]❌ Input CSV not found: {input_file}[/]")
         sys.exit(1)
 
-    run(input_file, args.output, max(1, args.batch), args.verbose)
+    run(input_file, args.output, max(1, args.batch), args.verbose, args.refine)
