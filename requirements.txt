@@ -1,5 +1,5 @@
-groq
-python-dotenv
-tqdm
-rich
-retrying
+groq==0.4.*
+python-dotenv==1.0.*
+tqdm==4.*
+rich==13.*
+retrying==1.3.*
