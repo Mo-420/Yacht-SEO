@@ -121,9 +121,8 @@ def generate(prompt: str) -> Tuple[str, int, int]:
     resp = client.chat.completions.create(
         model=MODEL_ID,
         messages=messages,
-        max_completion_tokens=1100,
+        max_tokens=1100,
         temperature=_TEMP,
-        reasoning_effort=REASONING_EFFORT,
     )
     usage = resp.usage  # type: ignore[attr-defined]
     text = resp.choices[0].message.content.strip()  # type: ignore[index]
