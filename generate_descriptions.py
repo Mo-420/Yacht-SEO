@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Simple yacht description generator using Groq API.
+Usage: python generate_descriptions.py input.csv output.csv
+"""
+
 import os
 import sys
 import csv
@@ -9,11 +15,6 @@ from retrying import retry
 from tqdm import tqdm
 from rich.console import Console
 import pandas as pd
-
-try:
-    import sheets  # local module for Google Sheets helper functions
-except ImportError:
-    sheets = None  # typed: ignore
 
 # Third‐party Groq client
 from groq import Groq
@@ -32,7 +33,6 @@ if not API_KEY:
     sys.exit(1)
 
 MODEL_ID = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-API_BASE = os.getenv("GROQ_API_BASE")  # optional custom endpoint
 
 # Allow runtime control of sampling temperature via env var
 try:
@@ -43,96 +43,91 @@ except ValueError:
 TOKEN_PRICE_IN = 0.15 / 1_000_000  # USD per prompt token
 TOKEN_PRICE_OUT = 0.75 / 1_000_000  # USD per completion token
 
-# Long-form SEO prompt base (can be overridden at runtime via CUSTOM_PROMPT_BASE env var)
-_DEFAULT_PROMPT_BASE = (
-    "For each yacht below, produce two distinct sections separated by a blank line:\n"
-    "1. Page Intro — 70-100 words (2-4 sentences or short bullets). Start with the primary keyword and write in second person, vivid and engaging.\n"
-    "2. <meta> Description — max 155 characters. Single sentence, includes the primary keyword and a call-to-action.\n\n"
-    "Follow this template inside the Page Intro:\n"
-    "• Hero hook sentence with the exact target keyword (e.g. \"Sunreef 80 charter Greece\")\n"
-    "• Quick specs bullets (length, cabins, guests, crew)\n"
-    "• One-sentence highlight of standout features or local flavour\n\n"
-    "Guidelines:\n"
-    "• Use polished UK English, second-person tone (\"you will…\").\n"
-    "• Keep keyword density ~1 % and weave LSI terms naturally (luxury catamaran Greece, private yacht charter, Mediterranean yacht holiday, water toys).\n"
-    "• No keyword stuffing. Use varied sentence lengths.\n"
-    "• Never invent specifications beyond the supplied data.\n"
-    "• Do NOT add extra commentary outside the two sections.\n\n"
-    "Write a 700-word, SEO-optimised luxury-yacht description. "
-    "Use keywords: luxury catamaran Greece, Sunreef 80 charter, Mediterranean yacht holidays, "
-    "private yacht with water toys. "
-    "Add <h2>/<h3> headings (Interiors, Accommodation, Watertoys, Destinations, Crew). "
-    "Conclude with a 140-character meta description and a clear call-to-action. "
-    "Keep strictly to the supplied data; do NOT invent features.\n\n"
-)
+# System prompt for the AI
+SYSTEM_PROMPT = """You are "Ocean Pen", an elite luxury-yacht copywriter and SEO strategist.
 
-PROMPT_BASE = os.getenv("CUSTOM_PROMPT_BASE", _DEFAULT_PROMPT_BASE)
-_DEFAULT_SYSTEM_PROMPT = (
-    "You are “Ocean Pen”, an elite luxury-yacht copywriter and SEO strategist.\n\n"
-    "Writing Guidelines\n"
-    "• Write in polished UK English with a confident, aspirational tone, aimed at affluent travellers and yacht charter clientele.\n"
-    "• Maintain absolute factual accuracy—never invent or embellish yacht specifications, amenities, crew details, or destinations.\n"
-    "• Balance evocative, persuasive storytelling with on-page SEO best practices.\n"
-    "• Structure content clearly using HTML headings (<h2>, <h3>), concise paragraphs, bullet points, and bolded key selling points to enhance readability and engagement.\n\n"
-    "SEO & Keyword Guidance\n"
-    "• Naturally incorporate primary keywords alongside semantic variants (LSI terms, synonyms, and relevant long-tail phrases).\n"
-    "• Maintain a keyword density of approximately 1%, prioritising readability and natural flow over keyword stuffing.\n"
-    "• Optimise meta titles (under 60 characters), meta descriptions (under 140 characters), and headings for targeted keywords.\n"
-    "• Use short sentences and vary your sentence length and structure to maximise readability and dwell time.\n\n"
-    "Engagement & Conversion\n"
-    "• Write compelling introductions that immediately communicate the yacht’s unique value proposition.\n"
-    "• Optimise each paragraph to captivate readers, answer search intent thoroughly, and encourage deeper scrolling.\n"
-    "• Close each description with a clear, action-oriented call-to-action, encouraging visitors to book, enquire, or contact directly.\n\n"
-    "Example Structure\n"
-    "• <h2> Yacht Introduction (highlight yacht’s name, size, key USP)\n"
-    "• <h3> Interior & Accommodation (comfort, layout, design highlights)\n"
-    "• <h3> Amenities & Features (notable facilities, water toys, tech)\n"
-    "• <h3> Destinations & Experiences (recommended itinerary, exclusive insights)\n"
-    "• <h3> Crew & Service (professionalism, special skills, personalised attention)\n"
-    "• Final Call-to-Action\n\n"
-    "Final Deliverables\n"
-    "• Polished, engaging, SEO-optimised yacht description content.\n"
-    "• A concise meta description under 140 characters, including primary keywords and enticing the click.\n\n"
-    "Goal: Create authoritative, engaging content that consistently outperforms competitors in Google organic search, enhances brand prestige, and converts high-value visitors into yacht charter clients."
-)
+Writing Guidelines
+• Write in polished UK English with a confident, aspirational tone, aimed at affluent travellers and yacht charter clientele.
+• Maintain absolute factual accuracy—never invent or embellish yacht specifications, amenities, crew details, or destinations.
+• Balance evocative, persuasive storytelling with on-page SEO best practices.
+• Structure content clearly using HTML headings (<h2>, <h3>), concise paragraphs, bullet points, and bolded key selling points to enhance readability and engagement.
 
-SYSTEM_PROMPT = os.getenv("CUSTOM_SYSTEM_PROMPT", _DEFAULT_SYSTEM_PROMPT)
-REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "high")
+SEO & Keyword Guidance
+• Naturally incorporate primary keywords alongside semantic variants (LSI terms, synonyms, and relevant long-tail phrases).
+• Maintain a keyword density of approximately 1%, prioritising readability and natural flow over keyword stuffing.
+• Optimise meta titles (under 60 characters), meta descriptions (under 140 characters), and headings for targeted keywords.
+• Use short sentences and vary your sentence length and structure to maximise readability and dwell time.
 
-# Prompt used for the refinement pass
-REFINE_PROMPT = (
-    "Improve the following luxury-yacht description: fix any grammar issues, tighten wording, "
-    "ensure keywords remain, keep all facts, preserve HTML structure, and keep length similar. "
-    "Return the refined description only without extra commentary.\n\n"
-)
+Engagement & Conversion
+• Write compelling introductions that immediately communicate the yacht's unique value proposition.
+• Optimise each paragraph to captivate readers, answer search intent thoroughly, and encourage deeper scrolling.
+• Close each description with a clear, action-oriented call-to-action, encouraging visitors to book, enquire, or contact directly.
 
-client_kwargs = dict(api_key=API_KEY)
-if API_BASE:
-    client_kwargs["base_url"] = API_BASE
-client = Groq(**client_kwargs)
+Example Structure
+• <h2> Yacht Introduction (highlight yacht's name, size, key USP)
+• <h3> Interior & Accommodation (comfort, layout, design highlights)
+• <h3> Amenities & Features (notable facilities, water toys, tech)
+• <h3> Destinations & Experiences (recommended itinerary, exclusive insights)
+• <h3> Crew & Service (professionalism, special skills, personalised attention)
+• Final Call-to-Action
+
+Final Deliverables
+• Polished, engaging, SEO-optimised yacht description content.
+• A concise meta description under 140 characters, including primary keywords and enticing the click.
+
+Goal: Create authoritative, engaging content that consistently outperforms competitors in Google organic search, enhances brand prestige, and converts high-value visitors into yacht charter clients."""
+
+# User prompt template
+USER_PROMPT_TEMPLATE = """Write a 750-word, conversion-focused yacht charter description that will outrank Google results for the query "luxury catamaran Greece".
+
+Yacht data:
+  Name: {name}
+  Builder / Model: {builder} {model}
+  Year: {year}
+  Length: {length} m
+  Guests: {guests} in {cabins} cabins
+  Crew: {crew}
+  Weekly rate: {price}
+  Watertoys: {watertoys}
+  Home port: {location}
+
+• Use LSI terms: Greek island hopping, Aegean sailing holiday, crewed catamaran charter.
+• Headings: <h2>Highlights</h2> … <h2>The Crew</h2> (as listed below).
+• 2–4 short paragraphs under each heading.
+• Maintain keyword density ≈1 %; avoid keyword stuffing.
+• End with <h2>Book Your Charter</h2> + persuasive CTA.
+• Finish with a 140-char <meta> description containing the primary keyword.
+• Do NOT invent specs beyond the data above."""
+
+client = Groq(api_key=API_KEY)
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Core Functions
 # ---------------------------------------------------------------------------
 
 def make_prompt(row: Dict[str, str]) -> str:
-    """Craft the prompt for a single yacht record based on the global PROMPT_BASE."""
-    details = (
-        f"Name: {row.get('name', 'Unknown')}\n"
-        f"Length: {row.get('length', 'N/A')} meters\n"
-        f"Year: {row.get('year', 'N/A')}\n"
-        f"Price: ${row.get('price', 'N/A')}\n"
+    """Create the prompt for a single yacht."""
+    return USER_PROMPT_TEMPLATE.format(
+        name=row.get('name', 'Unknown'),
+        builder=row.get('builder', 'N/A'),
+        model=row.get('model', 'N/A'),
+        year=row.get('year', 'N/A'),
+        length=row.get('length', 'N/A'),
+        guests=row.get('guests', 'N/A'),
+        cabins=row.get('cabins', 'N/A'),
+        crew=row.get('crew', 'N/A'),
+        price=row.get('price', 'N/A'),
+        watertoys=row.get('watertoys', 'N/A'),
+        location=row.get('location', 'N/A')
     )
-    return PROMPT_BASE + details
-
 
 @retry(wait_exponential_multiplier=1000, wait_exponential_max=10000, stop_max_attempt_number=5)
 def generate(prompt: str) -> Tuple[str, int, int]:
     """Call the Groq API and return (text, prompt_tokens, completion_tokens)."""
-    messages: list[dict[str, str]] = []
-    if SYSTEM_PROMPT:
-        messages.append({"role": "system", "content": SYSTEM_PROMPT})
-    messages.append({"role": "user", "content": prompt})
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt}
+    ]
 
     resp = client.chat.completions.create(
         model=MODEL_ID,
@@ -140,10 +135,11 @@ def generate(prompt: str) -> Tuple[str, int, int]:
         max_tokens=1100,
         temperature=_TEMP,
     )
-    usage = resp.usage  # type: ignore[attr-defined]
-    text = resp.choices[0].message.content.strip()  # type: ignore[index]
+    
+    usage = resp.usage
+    text = resp.choices[0].message.content.strip()
 
-    # Groq may return usage as a dict-like object, an object with attributes, or None.
+    # Handle usage data
     if usage:
         if isinstance(usage, dict):
             prompt_tok = usage.get("prompt_tokens", 0)
@@ -156,111 +152,75 @@ def generate(prompt: str) -> Tuple[str, int, int]:
 
     return text, prompt_tok, completion_tok
 
-
-# Second-pass refinement helper
-def refine_description(description: str) -> Tuple[str, int, int]:
-    prompt = REFINE_PROMPT + description
-    return generate(prompt)
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-def run(
-    input_csv: str,
-    output_csv: str,
-    batch_size: int,
-    verbose: bool,
-    refine: bool = False,
-) -> None:
+def process_csv(input_csv: str, output_csv: str) -> None:
+    """Process the input CSV and generate descriptions."""
+    # Read input CSV
     with open(input_csv, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
 
+    console.print(f"[bold green]Processing {len(rows)} yachts...[/]")
+    
     total_prompt = total_completion = 0
-    out_rows: List[Dict[str, str]] = []
+    out_rows = []
 
-    for start in tqdm(range(0, len(rows), batch_size), desc="Yachts processed (batches)"):
-        batch = rows[start : start + batch_size]
+    # Process each yacht
+    for i, row in enumerate(tqdm(rows, desc="Generating descriptions")):
+        try:
+            prompt = make_prompt(row)
+            description, prompt_tokens, completion_tokens = generate(prompt)
+            
+            # Add description to output row
+            out_row = row.copy()
+            out_row['description'] = description
+            out_rows.append(out_row)
+            
+            total_prompt += prompt_tokens
+            total_completion += completion_tokens
+            
+            console.print(f"[green]✓[/] {row.get('name', 'Unknown')} - {len(description)} chars")
+            
+        except Exception as e:
+            console.print(f"[bold red]✗[/] Error processing {row.get('name', 'Unknown')}: {e}")
+            # Add row with error message
+            out_row = row.copy()
+            out_row['description'] = f"ERROR: {str(e)}"
+            out_rows.append(out_row)
 
-        # Build prompt for batch
-        if batch_size == 1:
-            prompt = make_prompt(batch[0])
-        else:
-            yacht_blocks = [make_prompt(r) for r in batch]
-            prompt = (
-                PROMPT_BASE
-                + "Below are several yachts separated by '---'. For each yacht, "
-                  "return its description separated by \n---\n in the same order.\n\n"
-                + "\n---\n".join(yacht_blocks)
-            )
-
-        text, used_prompt, used_completion = generate(prompt)
-        total_prompt += used_prompt
-        total_completion += used_completion
-        cost_batch = used_prompt * TOKEN_PRICE_IN + used_completion * TOKEN_PRICE_OUT
-
-        # Split descriptions (or replicate if batch_size == 1)
-        descriptions = [text] if batch_size == 1 else [d.strip() for d in text.split("\n---\n") if d.strip()]
-        if len(descriptions) != len(batch):
-            console.print("[bold yellow]⚠️ Could not split descriptions as expected; writing raw output.[/]")
-            descriptions = [text] * len(batch)
-
-        for row, desc in zip(batch, descriptions):
-            row["seo_description"] = desc
-            if verbose:
-                cost_each = cost_batch / len(batch)
-                console.log(f"${cost_each:.4f} for {row.get('name', 'Unknown')}")
-
-        out_rows.extend(batch)
-
-    # Convert to DataFrame for optional sheet write
-    df_out = pd.DataFrame(out_rows)
-
-    # Write output file for download archive
+    # Write output CSV
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
-        df_out.to_csv(f, index=False)
+        if out_rows:
+            writer = csv.DictWriter(f, fieldnames=out_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(out_rows)
 
-    # Optional refinement step
-    if refine:
-        console.print("\n[bold cyan]🔄 Running refinement pass...[/]")
-        for row in tqdm(out_rows, desc="Refining", leave=False):
-            refined, p_tok, c_tok = refine_description(row["seo_description"])
-            row["seo_description_refined"] = refined
-            total_prompt += p_tok
-            total_completion += c_tok
+    # Print cost summary
+    cost = (total_prompt * TOKEN_PRICE_IN) + (total_completion * TOKEN_PRICE_OUT)
+    console.print(f"\n[bold green]✅ Done![/]")
+    console.print(f"Total cost: ${cost:.4f}")
+    console.print(f"Output saved to: {output_csv}")
 
-    cost_total = total_prompt * TOKEN_PRICE_IN + total_completion * TOKEN_PRICE_OUT
-    console.print(
-        f"[bold green]✅ Finished.[/] Prompt tokens: {total_prompt:,}, "
-        f"Completion tokens: {total_completion:,}, Cost ≈ ${cost_total:,.2f}"
-    )
-
-
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Generate SEO descriptions for yachts using Groq")
-    p.add_argument("--input", default="yachts.csv", help="Input CSV file path")
-    p.add_argument("--output", default="yacht_descriptions.csv", help="Output CSV path")
-    p.add_argument("--batch", type=int, default=1, help="Number of yachts per API request")
-    p.add_argument("--demo", action="store_true", help="Use sample_yachts.csv as input")
-    p.add_argument("--verbose", action="store_true", help="Print per-yacht cost during processing")
-    p.add_argument("--refine", action="store_true", help="Run second-pass refinement on each description")
-    return p.parse_args()
-
+def main():
+    global MODEL_ID, _TEMP
+    
+    parser = argparse.ArgumentParser(description="Generate yacht descriptions using Groq API")
+    parser.add_argument("input", help="Input CSV file with yacht data")
+    parser.add_argument("output", help="Output CSV file with descriptions")
+    parser.add_argument("--model", default=MODEL_ID, help=f"Groq model ID (default: {MODEL_ID})")
+    parser.add_argument("--temperature", type=float, default=_TEMP, help=f"Temperature (default: {_TEMP})")
+    
+    args = parser.parse_args()
+    
+    # Update globals if specified
+    if args.model != MODEL_ID:
+        MODEL_ID = args.model
+    if args.temperature != _TEMP:
+        _TEMP = args.temperature
+    
+    if not os.path.exists(args.input):
+        console.print(f"[bold red]❌ Input file not found: {args.input}[/]")
+        sys.exit(1)
+    
+    process_csv(args.input, args.output)
 
 if __name__ == "__main__":
-    args = parse_args()
-
-    input_file = "sample_yachts.csv" if args.demo else args.input
-
-    if not os.path.exists(input_file):
-        console.print(f"[bold red]❌ Input CSV not found: {input_file}[/]")
-        sys.exit(1)
-
-    run(
-        input_file,
-        args.output,
-        max(1, args.batch),
-        args.verbose,
-        args.refine,
-    )
+    main()
