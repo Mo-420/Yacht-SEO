@@ -45,6 +45,19 @@ TOKEN_PRICE_OUT = 0.75 / 1_000_000  # USD per completion token
 
 # Long-form SEO prompt base (can be overridden at runtime via CUSTOM_PROMPT_BASE env var)
 _DEFAULT_PROMPT_BASE = (
+    "For each yacht below, produce two distinct sections separated by a blank line:\n"
+    "1. Page Intro — 70-100 words (2-4 sentences or short bullets). Start with the primary keyword and write in second person, vivid and engaging.\n"
+    "2. <meta> Description — max 155 characters. Single sentence, includes the primary keyword and a call-to-action.\n\n"
+    "Follow this template inside the Page Intro:\n"
+    "• Hero hook sentence with the exact target keyword (e.g. \"Sunreef 80 charter Greece\")\n"
+    "• Quick specs bullets (length, cabins, guests, crew)\n"
+    "• One-sentence highlight of standout features or local flavour\n\n"
+    "Guidelines:\n"
+    "• Use polished UK English, second-person tone (\"you will…\").\n"
+    "• Keep keyword density ~1 % and weave LSI terms naturally (luxury catamaran Greece, private yacht charter, Mediterranean yacht holiday, water toys).\n"
+    "• No keyword stuffing. Use varied sentence lengths.\n"
+    "• Never invent specifications beyond the supplied data.\n"
+    "• Do NOT add extra commentary outside the two sections.\n\n"
     "Write a 700-word, SEO-optimised luxury-yacht description. "
     "Use keywords: luxury catamaran Greece, Sunreef 80 charter, Mediterranean yacht holidays, "
     "private yacht with water toys. "
