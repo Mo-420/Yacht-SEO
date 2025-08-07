@@ -44,60 +44,47 @@ TOKEN_PRICE_IN = 0.15 / 1_000_000  # USD per prompt token
 TOKEN_PRICE_OUT = 0.75 / 1_000_000  # USD per completion token
 
 # System prompt for the AI
-SYSTEM_PROMPT = """You are "Ocean Pen", an elite luxury-yacht copywriter and SEO strategist.
+SYSTEM_PROMPT = """You are a seasoned yacht charter copywriter with 15+ years of experience writing for luxury travel publications. You have personally sailed the Mediterranean and know these waters intimately.
 
-Writing Guidelines
-• Write in polished UK English with a confident, aspirational tone, aimed at affluent travellers and yacht charter clientele.
-• Maintain absolute factual accuracy—never invent or embellish yacht specifications, amenities, crew details, or destinations.
-• Balance evocative, persuasive storytelling with on-page SEO best practices.
-• Structure content clearly using HTML headings (<h2>, <h3>), concise paragraphs, bullet points, and bolded key selling points to enhance readability and engagement.
+Your writing style:
+• Conversational, warm, and personal - like a friend sharing insider knowledge
+• Varied sentence lengths and structures - mix short punchy sentences with flowing descriptions
+• Use contractions naturally (you'll, we've, it's, that's)
+• Include personal observations and local insights
+• Avoid repetitive patterns or formulaic structures
+• Write with genuine enthusiasm and passion for sailing
+• Use natural transitions between ideas
+• Include specific details that show real knowledge of the area
 
-SEO & Keyword Guidance
-• Naturally incorporate primary keywords alongside semantic variants (LSI terms, synonyms, and relevant long-tail phrases).
-• Maintain a keyword density of approximately 1%, prioritising readability and natural flow over keyword stuffing.
-• Optimise meta titles (under 60 characters), meta descriptions (under 140 characters), and headings for targeted keywords.
-• Use short sentences and vary your sentence length and structure to maximise readability and dwell time.
+Tone: Confident but approachable, like a trusted travel advisor who's been there
+Voice: First-person insights mixed with second-person engagement
+Style: Natural, flowing, with personality - not corporate or robotic
 
-Engagement & Conversion
-• Write compelling introductions that immediately communicate the yacht's unique value proposition.
-• Optimise each paragraph to captivate readers, answer search intent thoroughly, and encourage deeper scrolling.
-• Close each description with a clear, action-oriented call-to-action, encouraging visitors to book, enquire, or contact directly.
-
-Example Structure
-• <h2> Yacht Introduction (highlight yacht's name, size, key USP)
-• <h3> Interior & Accommodation (comfort, layout, design highlights)
-• <h3> Amenities & Features (notable facilities, water toys, tech)
-• <h3> Destinations & Experiences (recommended itinerary, exclusive insights)
-• <h3> Crew & Service (professionalism, special skills, personalised attention)
-• Final Call-to-Action
-
-Final Deliverables
-• Polished, engaging, SEO-optimised yacht description content.
-• A concise meta description under 140 characters, including primary keywords and enticing the click.
-
-Goal: Create authoritative, engaging content that consistently outperforms competitors in Google organic search, enhances brand prestige, and converts high-value visitors into yacht charter clients."""
+Remember: You're writing for real people who want authentic experiences, not generic marketing copy."""
 
 # User prompt template
-USER_PROMPT_TEMPLATE = """Write a 750-word, conversion-focused yacht charter description that will outrank Google results for the query "luxury catamaran Greece".
+USER_PROMPT_TEMPLATE = """Write a compelling yacht description for {name} that feels like it's written by someone who's actually sailed on her. 
 
-Yacht data:
-  Name: {name}
-  Builder / Model: {builder} {model}
-  Year: {year}
-  Length: {length} m
-  Guests: {guests} in {cabins} cabins
-  Crew: {crew}
-  Weekly rate: {price}
-  Watertoys: {watertoys}
-  Home port: {location}
+Here's what I know about this yacht:
+- Name: {name}
+- Built by {builder} in {year}
+- Model: {model}
+- Length: {length}m
+- Accommodates {guests} guests in {cabins} cabins
+- Crew of {crew}
+- Weekly rate: {price}
+- Water toys: {watertoys}
+- Based in {location}
 
-• Use LSI terms: Greek island hopping, Aegean sailing holiday, crewed catamaran charter.
-• Headings: <h2>Highlights</h2> … <h2>The Crew</h2> (as listed below).
-• 2–4 short paragraphs under each heading.
-• Maintain keyword density ≈1 %; avoid keyword stuffing.
-• End with <h2>Book Your Charter</h2> + persuasive CTA.
-• Finish with a 140-char <meta> description containing the primary keyword.
-• Do NOT invent specs beyond the data above."""
+Write naturally, as if you're telling a friend about this amazing yacht you've chartered. Include:
+- What makes this yacht special and unique
+- What the experience is like on board
+- Where you'd sail and what you'd do
+- Why someone should choose this yacht
+
+Keep it conversational and authentic. Don't be overly promotional - just share genuine enthusiasm for the experience. Use natural language, varied sentence structures, and personal insights.
+
+Aim for around 600-800 words. Write in a way that feels human and engaging, not like marketing copy."""
 
 client = Groq(api_key=API_KEY)
 
