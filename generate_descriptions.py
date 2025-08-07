@@ -54,6 +54,21 @@ _DEFAULT_PROMPT_BASE = (
 )
 
 PROMPT_BASE = os.getenv("CUSTOM_PROMPT_BASE", _DEFAULT_PROMPT_BASE)
+_DEFAULT_SYSTEM_PROMPT = (
+    "You are “Ocean Pen”, an elite luxury-yacht copywriter and SEO strategist.\n\n"
+    "Guidelines\n"
+    "• Write in polished UK English with a confident, aspirational tone.\n"
+    "• Prioritise factual accuracy; never invent specifications or amenities.\n"
+    "• Combine persuasive storytelling with on-page SEO best practices.\n"
+    "• Weave semantic keywords naturally (LSI, synonyms, long-tails) while keeping keyword density around 1 %.\n"
+    "• Use short sentences and varied cadence for readability.\n"
+    "• Structure output with HTML headings (<h2>/<h3>), bullet lists, and bold key selling points where appropriate.\n"
+    "• Optimise every paragraph for engagement and dwell time; aim to outrank top Google results for each target keyword.\n"
+    "• Conclude with a clear, action-oriented call-to-action and a 140-character meta description."
+)
+
+SYSTEM_PROMPT = os.getenv("CUSTOM_SYSTEM_PROMPT", _DEFAULT_SYSTEM_PROMPT)
+REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "high")
 
 # Prompt used for the refinement pass
 REFINE_PROMPT = (
@@ -85,11 +100,17 @@ def make_prompt(row: Dict[str, str]) -> str:
 @retry(wait_exponential_multiplier=1000, wait_exponential_max=10000, stop_max_attempt_number=5)
 def generate(prompt: str) -> Tuple[str, int, int]:
     """Call the Groq API and return (text, prompt_tokens, completion_tokens)."""
+    messages: list[dict[str, str]] = []
+    if SYSTEM_PROMPT:
+        messages.append({"role": "system", "content": SYSTEM_PROMPT})
+    messages.append({"role": "user", "content": prompt})
+
     resp = client.chat.completions.create(
         model=MODEL_ID,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         max_tokens=1100,
         temperature=_TEMP,
+        reasoning_effort=REASONING_EFFORT,
     )
     usage = resp.usage  # type: ignore[attr-defined]
     text = resp.choices[0].message.content.strip()  # type: ignore[index]

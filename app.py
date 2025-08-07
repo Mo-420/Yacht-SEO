@@ -92,7 +92,8 @@ verbose = st.sidebar.checkbox("Verbose per-yacht cost log")
 model_id = st.sidebar.text_input("Groq model ID", value=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
 temperature_ui = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7, step=0.05)
 refine = st.sidebar.checkbox("Refine / proofread descriptions")
-system_prompt = st.sidebar.text_area("System prompt (optional)")
+default_sys = os.getenv("CUSTOM_SYSTEM_PROMPT", "You are “Ocean Pen”, an elite luxury-yacht copywriter and SEO strategist.\n\nGuidelines\n• Write in polished UK English with a confident, aspirational tone.\n• Prioritise factual accuracy; never invent specifications or amenities.\n• Combine persuasive storytelling with on-page SEO best practices.\n• Weave semantic keywords naturally (LSI, synonyms, long-tails) while keeping keyword density around 1 %.\n• Use short sentences and varied cadence for readability.\n• Structure output with HTML headings (<h2>/<h3>), bullet lists, and bold key selling points where appropriate.\n• Optimise every paragraph for engagement and dwell time; aim to outrank top Google results for each target keyword.\n• Conclude with a clear, action-oriented call-to-action and a 140-character meta description.")
+system_prompt = st.sidebar.text_area("System prompt (optional)", value=default_sys)
 custom_prompt = st.sidebar.text_area("Custom USER prompt base (optional)")
 
 
