@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 from starlette.background import BackgroundTasks
+from groq import Groq
 
 # Import our existing generation logic
 from generate_descriptions import (
@@ -21,7 +22,6 @@ from generate_descriptions import (
     SYSTEM_PROMPT,
     USER_PROMPT_TEMPLATE,
     make_prompt,
-    generate as generate_text,
 )
 
 app = FastAPI(
@@ -99,14 +99,30 @@ async def generate_from_csv(background_tasks: BackgroundTasks, file: UploadFile 
 
 @app.post("/generate-single")
 async def generate_single_yacht(yacht: YachtData):
-    """Generate description for a single yacht without CSV roundtrip."""
+    """Generate description for a single yacht (direct Groq call)."""
     yacht_dict = yacht.dict()
     try:
         prompt = make_prompt(yacht_dict)
-        description, _, _ = generate_text(prompt)
+        # Prefer explicit model here to avoid environment/model issues
+        model_id = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY is not set")
+        client = Groq(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=1100,
+            temperature=float(os.getenv("GROQ_TEMPERATURE", "0.7")),
+        )
+        description = resp.choices[0].message.content.strip()
         return {"yacht": yacht_dict, "description": description}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        # Include the model in the error to aid debugging
+        raise HTTPException(status_code=500, detail=f"Processing error ({type(e).__name__}): {str(e)}; model={os.getenv('GROQ_MODEL', 'llama-3.1-70b-versatile')}")
 
 @app.get("/health")
 async def health_check():
