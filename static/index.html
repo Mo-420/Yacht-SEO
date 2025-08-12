@@ -122,20 +122,24 @@
         <h1>🛥️ Yacht-SEO Generator</h1>
         
         <div class="sample-csv">
-            <h3>📋 CSV Format</h3>
-            <p>Your CSV should have these columns:</p>
+            <h3>📋 Data Formats</h3>
+            <p>Supported uploads: CSV, JSON (array or NDJSON), Excel (.xlsx)</p>
+            <p>Columns expected:</p>
             <pre>name,length,year,price,cabins,guests,crew,watertoys,location,model,builder
 GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP","Greece","Sunreef 80","Sunreef Yachts"</pre>
         </div>
 
         <div class="upload-area" id="uploadArea">
-            <h3>📁 Upload Your CSV File</h3>
-            <p>Drag and drop your CSV file here, or click to browse</p>
-            <input type="file" id="fileInput" accept=".csv">
+            <h3>📁 Upload Your Data File</h3>
+            <p>Drag and drop a file here, or click to browse. Supported: CSV, JSON, Excel (.xlsx)</p>
+            <input type="file" id="fileInput" accept=".csv,.json,.xlsx">
             <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
         </div>
 
         <div style="text-align: center;">
+            <label style="display:block;margin:10px 0;">
+                <input type="checkbox" id="asyncMode"> Use async mode for large files (5k+ yachts)
+            </label>
             <button class="btn" id="generateBtn" onclick="generateDescriptions()" disabled>Generate Descriptions</button>
         </div>
 
@@ -182,11 +186,11 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
         });
 
         function handleFile(file) {
-            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-                showError('Please select a CSV file');
+            const ok = ['.csv', '.json', '.xlsx'].some(ext => file.name.toLowerCase().endsWith(ext));
+            if (!ok) {
+                showError('Unsupported file. Use CSV, JSON, or Excel (.xlsx)');
                 return;
             }
-            
             selectedFile = file;
             generateBtn.disabled = false;
             showSuccess(`File selected: ${file.name}`);
@@ -208,10 +212,68 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
             try {
                 progressBar.style.width = '30%';
                 
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    body: formData
-                });
+                const useAsync = document.getElementById('asyncMode').checked;
+                if (useAsync) {
+                    const start = await fetch('/generate-async', { method: 'POST', body: formData });
+                    if (!start.ok) {
+                        const err = await start.text();
+                        throw new Error(err);
+                    }
+                    const { job_id } = await start.json();
+                    progressBar.style.width = '50%';
+                    let status = 'queued';
+                    while (status !== 'completed') {
+                        await new Promise(r => setTimeout(r, 3000));
+                        const res = await fetch(`/jobs/${job_id}`);
+                        if (!res.ok) {
+                            const err = await res.text();
+                            throw new Error(err);
+                        }
+                        const info = await res.json();
+                        status = info.status;
+                        if (status === 'failed') {
+                            throw new Error(info.error || 'Job failed');
+                        }
+                    }
+                    progressBar.style.width = '80%';
+                    const dl = await fetch(`/jobs/${job_id}/result`);
+                    if (!dl.ok) {
+                        const err = await dl.text();
+                        throw new Error(err);
+                    }
+                    const blob = await dl.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `yacht_descriptions_${selectedFile.name.replace(/\.[^.]+$/, '')}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    progressBar.style.width = '100%';
+                    showSuccess('✅ Descriptions generated successfully (async)! File downloaded.');
+                } else {
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    progressBar.style.width = '70%';
+                    if (!response.ok) {
+                        const error = await response.text();
+                        throw new Error(error);
+                    }
+                    progressBar.style.width = '100%';
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `yacht_descriptions_${selectedFile.name}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    showSuccess('✅ Descriptions generated successfully! File downloaded.');
+                }
 
                 progressBar.style.width = '70%';
 
