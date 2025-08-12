@@ -16,7 +16,13 @@ import uvicorn
 from starlette.background import BackgroundTasks
 
 # Import our existing generation logic
-from generate_descriptions import process_csv, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
+from generate_descriptions import (
+    process_csv,
+    SYSTEM_PROMPT,
+    USER_PROMPT_TEMPLATE,
+    make_prompt,
+    generate as generate_text,
+)
 
 app = FastAPI(
     title="Yacht-SEO Generator API",
@@ -93,44 +99,14 @@ async def generate_from_csv(background_tasks: BackgroundTasks, file: UploadFile 
 
 @app.post("/generate-single")
 async def generate_single_yacht(yacht: YachtData):
-    """Generate description for a single yacht"""
-    
-    # Convert to dict format expected by our generator
+    """Generate description for a single yacht without CSV roundtrip."""
     yacht_dict = yacht.dict()
-    
-    # Create temporary CSV with single yacht (text mode for csv module)
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8", newline="") as input_file:
-        writer = csv.DictWriter(input_file, fieldnames=list(yacht_dict.keys()))
-        writer.writeheader()
-        writer.writerow(yacht_dict)
-        input_file_path = input_file.name
-    
-    output_file_path = input_file_path.replace(".csv", "_output.csv")
-    
     try:
-        # Process the CSV
-        process_csv(input_file_path, output_file_path)
-        
-        # Read the result
-        with open(output_file_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            result = next(reader)
-        
-        return {
-            "yacht": yacht_dict,
-            "description": result.get('description', '')
-        }
-    
+        prompt = make_prompt(yacht_dict)
+        description, _, _ = generate_text(prompt)
+        return {"yacht": yacht_dict, "description": description}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
-    
-    finally:
-        # Clean up temp files
-        try:
-            os.unlink(input_file_path)
-            os.unlink(output_file_path)
-        except:
-            pass
 
 @app.get("/health")
 async def health_check():
