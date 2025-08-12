@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
+from starlette.background import BackgroundTasks
 
 # Import our existing generation logic
 from generate_descriptions import process_csv, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
@@ -53,7 +54,7 @@ async def api_info():
     }
 
 @app.post("/generate")
-async def generate_from_csv(file: UploadFile = File(...)):
+async def generate_from_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Generate descriptions from uploaded CSV file"""
     
     if not file.filename.endswith('.csv'):
@@ -71,21 +72,22 @@ async def generate_from_csv(file: UploadFile = File(...)):
         # Process the CSV
         process_csv(input_file_path, output_file_path)
         
-        # Return the generated file
+        # Return the generated file and schedule cleanup after response is sent
+        background_tasks.add_task(os.unlink, output_file_path)
         return FileResponse(
             output_file_path,
             media_type="text/csv",
-            filename=f"yacht_descriptions_{file.filename}"
+            filename=f"yacht_descriptions_{file.filename}",
+            background=background_tasks
         )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
     
     finally:
-        # Clean up temp files
+        # Clean up temp files (do not delete output here; it's scheduled in background)
         try:
             os.unlink(input_file_path)
-            os.unlink(output_file_path)
         except:
             pass
 
@@ -96,9 +98,9 @@ async def generate_single_yacht(yacht: YachtData):
     # Convert to dict format expected by our generator
     yacht_dict = yacht.dict()
     
-    # Create temporary CSV with single yacht
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as input_file:
-        writer = csv.DictWriter(input_file, fieldnames=yacht_dict.keys())
+    # Create temporary CSV with single yacht (text mode for csv module)
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8", newline="") as input_file:
+        writer = csv.DictWriter(input_file, fieldnames=list(yacht_dict.keys()))
         writer.writeheader()
         writer.writerow(yacht_dict)
         input_file_path = input_file.name
