@@ -137,6 +137,19 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
         </div>
 
         <div style="text-align: center;">
+            <select id="service" style="padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;display:block;">
+                <option value="seo">SEO Descriptions</option>
+                <option value="general">General Generator</option>
+            </select>
+            <textarea id="generalPrompt" placeholder="General prompt (for General Generator)" style="display:none;padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;min-height:120px;"></textarea>
+            <textarea id="systemPrompt" placeholder="Custom system prompt (optional)" style="padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;min-height:80px;"></textarea>
+            <textarea id="userInstructions" placeholder="Extra user instructions (optional)" style="display:none;padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;min-height:80px;"></textarea>
+            <select id="promptMode" style="display:none;padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;display:block;">
+                <option value="append" selected>Append</option>
+                <option value="prepend">Prepend</option>
+                <option value="replace">Replace</option>
+            </select>
+            <input id="passphrase" type="password" placeholder="Passphrase (if required)" style="padding:10px 14px;border-radius:10px;border:none;width: 80%;max-width:420px;margin:8px auto;display:block;">
             <label style="display:block;margin:10px 0;">
                 <input type="checkbox" id="asyncMode"> Use async mode for large files (5k+ yachts)
             </label>
@@ -157,8 +170,22 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
         const progress = document.getElementById('progress');
         const progressBar = document.getElementById('progressBar');
         const result = document.getElementById('result');
+        const service = document.getElementById('service');
+        const generalPrompt = document.getElementById('generalPrompt');
+        const systemPrompt = document.getElementById('systemPrompt');
+        const userInstructions = document.getElementById('userInstructions');
+        const promptMode = document.getElementById('promptMode');
 
         let selectedFile = null;
+
+        service.addEventListener('change', () => {
+            const isGeneral = service.value === 'general';
+            generalPrompt.style.display = isGeneral ? 'block' : 'none';
+            // system prompt is useful for both services, keep visible
+            systemPrompt.style.display = 'block';
+            userInstructions.style.display = isGeneral ? 'none' : 'block';
+            promptMode.style.display = isGeneral ? 'none' : 'block';
+        });
 
         // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
@@ -197,9 +224,11 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
         }
 
         async function generateDescriptions() {
-            if (!selectedFile) {
-                showError('Please select a file first');
-                return;
+            if (service.value !== 'general') {
+                if (!selectedFile) {
+                    showError('Please select a file first');
+                    return;
+                }
             }
 
             generateBtn.disabled = true;
@@ -208,13 +237,16 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
 
             const formData = new FormData();
             formData.append('file', selectedFile);
+            const pass = document.getElementById('passphrase').value.trim();
+            if (pass) formData.append('passphrase', pass);
+            const selectedService = service.value;
 
             try {
                 progressBar.style.width = '30%';
                 
                 const useAsync = document.getElementById('asyncMode').checked;
-                if (useAsync) {
-                    const start = await fetch('/generate-async', { method: 'POST', body: formData });
+                if (useAsync && selectedService === 'seo') {
+                    const start = await fetch('/services/seo/generate-async', { method: 'POST', body: formData });
                     if (!start.ok) {
                         const err = await start.text();
                         throw new Error(err);
@@ -252,11 +284,25 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
                     window.URL.revokeObjectURL(url);
                     progressBar.style.width = '100%';
                     showSuccess('✅ Descriptions generated successfully (async)! File downloaded.');
-                } else {
-                    const response = await fetch('/generate', {
-                        method: 'POST',
-                        body: formData
-                    });
+                } else if (selectedService === 'seo') {
+                    const sysVal = systemPrompt.value.trim();
+                    const userInstrVal = userInstructions.value.trim();
+                    const modeVal = promptMode.value;
+                    let response;
+                    if (sysVal || userInstrVal || modeVal !== 'append') {
+                        if (sysVal) formData.append('system_prompt', sysVal);
+                        if (userInstrVal) formData.append('user_instructions', userInstrVal);
+                        if (modeVal) formData.append('prompt_mode', modeVal);
+                        response = await fetch('/services/seo/generate-with-prompt', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    } else {
+                        response = await fetch('/services/seo/generate', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    }
                     progressBar.style.width = '70%';
                     if (!response.ok) {
                         const error = await response.text();
@@ -273,11 +319,29 @@ GENNY,23.87,2021,"€58,000 – €70,000",5,10,6,"Jacuzzi; Jet-ski; Seabob; SUP
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     showSuccess('✅ Descriptions generated successfully! File downloaded.');
+                } else if (selectedService === 'general') {
+                    // General generator uses JSON, not file
+                    const gp = generalPrompt.value.trim();
+                    if (!gp) {
+                        throw new Error('Please enter a general prompt');
+                    }
+                    const sp = systemPrompt.value.trim();
+                    const response = await fetch('/services/general/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: gp, system_prompt: sp || undefined, passphrase: pass || undefined })
+                    });
+                    if (!response.ok) {
+                        const error = await response.text();
+                        throw new Error(error);
+                    }
+                    const data = await response.json();
+                    showSuccess('✅ Generated:\n\n' + (data.content || '(empty)'));
                 }
 
                 progressBar.style.width = '70%';
 
-                if (!response.ok) {
+                if (selectedService === 'seo' && !response.ok) {
                     const error = await response.text();
                     throw new Error(error);
                 }

@@ -6,24 +6,29 @@ Generate SEO‑optimized yacht descriptions via web UI or HTTPS API. Handles lar
 #### Public URL
 - App: [Railway deployment](https://web-production-8a928.up.railway.app/)
 
-#### Web UI (no command line)
-1. Open the URL above.
-2. Upload a file in any of these formats:
-   - CSV
-   - JSON (array of objects or NDJSON)
-   - Excel (.xlsx)
-3. Optional: toggle “Use async mode” for very large files (recommended for 5k+ rows).
-4. Click “Generate Descriptions” to download the result CSV.
+#### Access Passphrase
+- Required passphrase for all generation endpoints: `YachtGPT`
+- Provide it via:
+  - HTTP header: `X-Passphrase: YachtGPT` (or `X-API-Passphrase`)
+  - Query string: `?passphrase=YachtGPT`
+  - Form field (file uploads): `passphrase=YachtGPT`
+  - JSON field (single-custom endpoint): `{"passphrase":"YachtGPT"}`
 
 Sample file in repo: `genny.csv`.
 
-#### API Endpoints (HTTPS)
+#### Services and Endpoints (HTTPS)
 - GET `/health` → service status
-- POST `/generate` → accepts CSV/JSON/Excel upload; returns CSV
-- POST `/generate-single` → accepts a single yacht JSON; returns `{ yacht, description }`
-- POST `/generate-async` → starts a background job for large files; returns `{ job_id, status }`
-- GET `/jobs/{job_id}` → get job status (`queued|processing|completed|failed`)
-- GET `/jobs/{job_id}/result` → download CSV when job is `completed`
+- SEO (`/services/seo/...`)
+  - POST `/services/seo/generate` → accepts CSV/JSON/Excel upload; returns CSV
+  - POST `/services/seo/generate-async` → starts a background job for large files; returns `{ job_id, status }`
+  - GET `/jobs/{job_id}` → get job status (`queued|processing|completed|failed`)
+  - GET `/jobs/{job_id}/result` → download CSV when job is `completed`
+  - POST `/services/seo/generate-with-prompt` → upload with a custom system prompt and optional parameters; supports `user_instructions` and `prompt_mode` (`append|prepend|replace`)
+  - POST `/services/seo/generate-single` and `/generate-single-custom` → single yacht generation
+- General (`/services/general/...`)
+  - POST `/services/general/generate` → JSON `{ prompt, system_prompt?, temperature?, max_tokens?, passphrase }`; returns `{ content }`
+
+- Legacy endpoints remain available: `/generate`, `/generate-async`, `/generate-with-prompt`, `/generate-single`, `/generate-single-custom`
 
 #### Health check
 ```bash
@@ -34,6 +39,7 @@ curl -s https://web-production-8a928.up.railway.app/health
 ```bash
 curl -fS -X POST \
   -F file=@/absolute/path/to/your.csv \
+  -F passphrase=YachtGPT \
   https://web-production-8a928.up.railway.app/generate \
   -o yacht_descriptions.csv
 ```
@@ -43,6 +49,7 @@ curl -fS -X POST \
 # JSON array example (file: yachts.json)
 curl -fS -X POST \
   -F file=@yachts.json \
+  -F passphrase=YachtGPT \
   https://web-production-8a928.up.railway.app/generate \
   -o yacht_descriptions.csv
 ```
@@ -51,6 +58,7 @@ curl -fS -X POST \
 ```bash
 curl -fS -X POST \
   -F file=@yachts.xlsx \
+  -F passphrase=YachtGPT \
   https://web-production-8a928.up.railway.app/generate \
   -o yacht_descriptions.csv
 ```
@@ -58,7 +66,7 @@ curl -fS -X POST \
 #### Large batch (async) — recommended for 5k+ yachts
 ```bash
 # Start job
-curl -s -X POST -F file=@big_yachts.xlsx https://web-production-8a928.up.railway.app/generate-async
+curl -s -X POST -F file=@big_yachts.xlsx -F passphrase=YachtGPT https://web-production-8a928.up.railway.app/generate-async
 # => {"job_id":"...","status":"queued"}
 
 # Poll status until "completed"
@@ -72,7 +80,7 @@ curl -s \
 
 #### Single yacht example: GENNY
 ```bash
-curl -fS -X POST https://web-production-8a928.up.railway.app/generate-single \
+curl -fS -X POST 'https://web-production-8a928.up.railway.app/generate-single?passphrase=YachtGPT' \
   -H "Content-Type: application/json" \
   -d '{
     "name": "GENNY",
@@ -87,6 +95,45 @@ curl -fS -X POST https://web-production-8a928.up.railway.app/generate-single \
     "model": "Sunreef 80",
     "builder": "Sunreef Yachts"
   }'
+```
+
+#### Single yacht with custom system prompt
+```bash
+curl -fS -X POST https://web-production-8a928.up.railway.app/generate-single-custom \
+  -H "Content-Type: application/json" \
+  -d '{
+    "passphrase": "YachtGPT",
+    "system_prompt": "Write as a luxury travel editor...",
+    "yacht": {
+      "name": "GENNY",
+      "length": 23.87,
+      "year": 2021,
+      "price": "€58,000 – €70,000",
+      "cabins": 5,
+      "guests": 10,
+      "crew": 6,
+      "watertoys": "Jacuzzi; Jet-ski; Seabob; SUP",
+      "location": "Greece",
+      "model": "Sunreef 80",
+      "builder": "Sunreef Yachts"
+    },
+    "params": {
+      "temperature": 0.6,
+      "max_tokens": 1200
+    }
+  }'
+```
+
+#### Upload with custom system prompt (bulk)
+```bash
+curl -fS -X POST \
+  -F file=@yachts.csv \
+  -F system_prompt='Write as a seasoned broker...' \
+  -F temperature=0.6 \
+  -F max_tokens=1100 \
+  -F passphrase=YachtGPT \
+  https://web-production-8a928.up.railway.app/generate-with-prompt \
+  -o yacht_descriptions.csv
 ```
 
 #### Notes
