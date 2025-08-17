@@ -583,6 +583,7 @@ class GeneralRequest(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     passphrase: Optional[str] = None
+    debug: Optional[bool] = False
 
 
 @general_router.post("/generate")
@@ -602,11 +603,41 @@ async def general_generate(request: Request, payload: GeneralRequest):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": payload.prompt},
             ],
-            max_tokens=(payload.max_tokens if isinstance(payload.max_tokens, int) and payload.max_tokens > 0 else 1100),
+            max_tokens=(payload.max_tokens if isinstance(payload.max_tokens, int) and payload.max_tokens > 0 else 400),
             temperature=(payload.temperature if isinstance(payload.temperature, (int, float)) else float(os.getenv("GROQ_TEMPERATURE", "0.7"))),
         )
-        content = resp.choices[0].message.content.strip()
-        return {"content": content}
+        # Extract content robustly
+        content = ""
+        try:
+            choice0 = resp.choices[0]
+            # Try standard content
+            msg = getattr(choice0, "message", None)
+            if msg is not None:
+                msg_content = getattr(msg, "content", None)
+                if not msg_content and isinstance(msg, dict):
+                    msg_content = msg.get("content")
+                if msg_content:
+                    content = str(msg_content).strip()
+            # Fallbacks
+            if not content:
+                text_alt = getattr(choice0, "text", None)
+                if text_alt:
+                    content = str(text_alt).strip()
+        except Exception:
+            pass
+        if not content:
+            content = ""
+        result: Dict[str, Any] = {"content": content}
+        if payload.debug:
+            try:
+                # Include limited debug information
+                result["debug"] = {
+                    "model": FIXED_MODEL_ID,
+                    "raw_finish_reason": getattr(resp.choices[0], "finish_reason", None),
+                }
+            except Exception:
+                result["debug"] = {"model": FIXED_MODEL_ID}
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing error ({type(e).__name__}): {str(e)}; model={FIXED_MODEL_ID}")
 
