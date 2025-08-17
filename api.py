@@ -625,20 +625,6 @@ async def general_generate_alias(request: Request, payload: GeneralRequest):
 @app.post("/generate-general")
 async def generate_general_legacy(request: Request, payload: GeneralRequest):
     return await general_generate(request, payload)
-        background_tasks.add_task(os.unlink, output_file_path)
-        return FileResponse(
-            output_file_path,
-            media_type="text/csv",
-            filename=f"yacht_descriptions_{os.path.basename(file.filename).rsplit('.',1)[0]}.csv",
-            background=background_tasks
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
-    finally:
-        try:
-            os.unlink(input_file_path)
-        except:
-            pass
 
 @app.get("/health")
 async def health_check():
