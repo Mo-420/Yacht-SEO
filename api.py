@@ -626,7 +626,21 @@ async def general_generate(request: Request, payload: GeneralRequest):
         except Exception:
             pass
         if not content:
-            content = ""
+            # Fallback: try text completions API for models that prefer prompts
+            try:
+                combined_prompt = f"System: {system_prompt}\n\nUser: {payload.prompt}\n\nAssistant:"
+                comp = client.completions.create(
+                    model=FIXED_MODEL_ID,
+                    prompt=combined_prompt,
+                    max_tokens=(payload.max_tokens if isinstance(payload.max_tokens, int) and payload.max_tokens > 0 else 400),
+                    temperature=(payload.temperature if isinstance(payload.temperature, (int, float)) else float(os.getenv("GROQ_TEMPERATURE", "0.7"))),
+                )
+                if getattr(comp, "choices", None):
+                    text_alt = getattr(comp.choices[0], "text", None)
+                    if text_alt:
+                        content = str(text_alt).strip()
+            except Exception:
+                content = ""
         result: Dict[str, Any] = {"content": content}
         if payload.debug:
             try:
